@@ -1,0 +1,3 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+PicardLefschetz = "356e5c01-6043-4289-b61b-2b899ed0f9ac"
