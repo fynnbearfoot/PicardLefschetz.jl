@@ -7,7 +7,7 @@
 
 
 This package implements two integration methods based on Picard-Lefschetz theory, as explained [here](https://p-lpi.github.io/).
-That is, we're aiming to calculate integrals of the form $\int_{R^n} ~ \vec{p}(\vec{x}) ~ \mathrm{e}^{\mathrm{i} \phi(\vec{x})} \mathrm{d} \vec{x} $, 
+That is, we're aiming to calculate integrals of the form $\int_{R^n} ~ \vec{p}(\vec{x}) ~ \mathrm{e}^{\mathrm{i} \phi(\vec{x})} d \vec{x} $, 
 for one ($n=1$) or two-dimensional ($n=2$) real-valued integration domains (1D and 2D version of the code).
 
 
