@@ -5,7 +5,7 @@
 # using GeometryBasics
 
 
-export crosses_point, intersection, closest_intersection
+# export crosses_point, intersection, closest_intersection
 
 struct Line2
     s::StaticArrays.SVector{2,Float64}
@@ -44,34 +44,46 @@ function crosses_point(line::Line2, point::Point, tolerance::Float64=0.25)
     return (xbound && ybound)
 end
 
-### maybe these two following functions could be united actually
+dist(tup1::Tuple, tup2::Tuple) = norm(tup2.-tup1)
 function crosses_point(c::Curve2, p::Point, tolerance::Float64=0.25)
-    crossing = false
-
-    for i in 1:(length(c.vertices)-1)
-        l = Line2(c.vertices[i], c.vertices[i+1])
-        if crosses_point(l, p , tolerance)
-            return i #crossing = true
-        end
-    end 
-    return crossing
+    minidist, miniidx = findmin([dist(vert,p.data) for vert in c.vertices])
+    
+    if minidist < tolerance
+        return miniidx
+    else
+        return false
+    end
 end
+
 
 function closest_intersection(ip::Int64, c::Curve2, p::Point, Δinit::Float64)
     ip_new = deepcopy(ip)
     n = 1
     Δ = Δinit
+    Δstep = Δ/9
+
     while !(ip_new==false) && n < 10
-#         @show Δ
         ip = ip_new
         ip_new = crosses_point(c, p, Δ)
-#         @show saddle_ip
         n +=1
-        Δ -= 0.1
+        Δ -= Δstep
     end
     ip
 end
 
+function dissect_curve(zs::ComplexF64, curve::Curve2, ip_guess::Int64, crossthresh::Float64)
+    saddle_ip = closest_intersection(ip_guess, curve, Point(reim(zs)...), crossthresh)
+            
+    if curve.vertices[saddle_ip] == reim(zs)
+        c1 = Curve2(curve.vertices[1:saddle_ip])
+        c2 = Curve2(curve.vertices[saddle_ip:end])             
+    else
+        c1 = Curve2(vcat(curve.vertices[1:saddle_ip-1],reim(zs)))
+        c2 = Curve2(vcat(reim(zs),curve.vertices[saddle_ip+1:end]))
+    end
+
+    return [c1,c2]
+end
 
 
 function intersection(l1::Line2, l2::Line2) 

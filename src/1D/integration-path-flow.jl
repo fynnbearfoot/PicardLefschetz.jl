@@ -2,7 +2,7 @@
 
 # using LinearAlgebra, FastGaussQuadrature
 
-export get_thimble, integrate_thimble
+# export get_thimble, integrate_thimble
 
 mutable struct MyPoint
     coord::Complex

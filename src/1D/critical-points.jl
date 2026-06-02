@@ -1,7 +1,7 @@
 
 # using NLsolve
 # using Sobol
-export solve_first_derivative, find_saddles_sobol
+export solve_first_derivative, find_saddles_sobol, find_saddle_similar_seed
 
 function solve_first_derivative(drv::Function, t0::Vector{Float64},
     roundDigits::Int64=5)
