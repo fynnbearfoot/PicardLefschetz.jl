@@ -61,4 +61,19 @@ function find_saddles_sobol(drv::Function,
     return saddles
 end;
 
+
+
+function find_saddle_similar_seed(drv::Function, ts::ComplexF64;roundDigits = 2)
+    
+    ts = solve_first_derivative(drv, [reim(ts)...], roundDigits) 
+    
+    if !isnothing(ts) 
+        ts_r = round(ts, digits=roundDigits)
+        return ts_r
+    else
+        return nothing
+    end    
+end
+
+
 nothing

@@ -23,8 +23,4 @@ Theoretically, the methods should work for generic phase functions $\phi(\mathbf
 If you have any ideas, want to contribute to, or make use of the package, please do not hesitate to get in touch!!!
 
 ## To Do
-- (everything)
-- write tests
-- include 2d code
-- make nice example graphs
-- write documentation
+(everything -- see github issues)
