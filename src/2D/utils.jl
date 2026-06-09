@@ -55,6 +55,18 @@ function imagrange(cd::ComplexDomain, N::Int64=50)
     return range(imag(cd.min), stop=imag(cd.max), length=N) 
 end
 
+function in(cd1::ComplexDomain, cd2::ComplexDomain)
+    # whether one complex domain is contained inside the other
+    return real(cd2.min) <= real(cd1.min) &&
+    real(cd1.max) <= real(cd2.max) &&
+    imag(cd2.min) <= imag(cd1.min) &&
+    imag(cd1.max) <= imag(cd2.max)
+end
+
+
+import Base.round
+round(cd::ComplexDomain; kwargs...) = ComplexDomain(Base.round(cd.min; kwargs...), Base.round(cd.max; kwargs...))
+
 ##########################################
 
 

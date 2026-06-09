@@ -1,32 +1,12 @@
-### not sure if I need those, let's see
-import Base.isequal
-isequal(p1::Point,p2::Point) = isequal(p1.x,p2.x) && isequal(p1.y,p2.y)
-Base.hash(p::Point, h::UInt) = hash([p.x,p.y], h)
-
-function point2vec(p::Point)
-    return [reim(p.x)...,reim(p.y)...]
-end;
-
-
-### utils
-mutable struct Index
-    coord::Vector{Int} ### this could be an MVector
+### QUAD (stores indices only)
+mutable struct QuadA
+    indices::Vector{Int} ### this could be an MVector
     active::Bool
-    Index(coord::Vector{Int64}) = new(coord, true)
+    QuadA(indices::Vector{Int64}) = new(indices, true)
 end
 
 
-midx(p1::Point,p2::Point) = (p2.x + p1.x)./2
-# midx(ps::Vector{Point{T}}) where T<:Number = sum([p.x for p in ps])/length(ps)
-midy(p1::Point,p2::Point) = (p2.y + p1.y)./2
-# midy(ps::Vector{Point{T}}) where T<:Number = sum([p.y for p in ps])/length(ps)
-
-midpoint(p1::Point,p2::Point) = Point(midx(p1,p2), midy(p1,p2))
-# midpoint(Ps::Vector{Point{T}}) where T<:Number = Point(midx(Ps), midy(Ps));
-
-dist(p1::Point, p2::Point) = norm([p1.x-p2.x, p1.y-p2.y])
-
-function maxdist(simplex::Vector{Point{T}}) where T<:Number
+function maxdist(simplex::Vector{PointA{T}}) where T<:Number
         p1,p2,p3,p4 = simplex
         d12 = dist(p1,p2) 
         d23 = dist(p2,p3)
@@ -38,20 +18,20 @@ function maxdist(simplex::Vector{Point{T}}) where T<:Number
 end
 
 
-function maxdist(idx::Int64, simplices::Vector{Index}, points::Vector{Point{T}}) where T<:Number
+function maxdist(idx::Int64, simplices::Vector{QuadA}, points::Vector{<:PointA})
     sim = simplices[idx]
 
-    v1, v2, v3, v4 = sim.coord[1], sim.coord[2], sim.coord[3], sim.coord[4] # indices
+    v1, v2, v3, v4 = sim.indices
     p1, p2, p3, p4 = points[v1], points[v2], points[v3], points[v4]
     return maxdist([p1,p2,p3,p4])
 end
 
-function subdivide_simplices!(points::Vector{Point{T}}, simplices::Vector{Index}, Δ::Float64, init::Bool=false) where T<:Number
-   ### CAREFUL - THIS WILL CREATE POINTS TWICE. I SHALL UPDATE THIS WITH THE IMPLEMENTATION FROM THE MASTER BRANCH!!!!
+function subdivide_quads!(points::Vector{<:PointA}, simplices::Vector{QuadA}, Δ::Float64, init::Bool=false) 
+
     for i3 in eachindex(simplices)
         sim = simplices[i3]
         if sim.active
-            v1, v2, v3, v4 = sim.coord[1], sim.coord[2], sim.coord[3], sim.coord[4] # indices
+            v1, v2, v3, v4 = sim.indices
             p1, p2, p3, p4 = points[v1], points[v2], points[v3], points[v4]
 
             if (p1.active && p2.active && p3.active && p4.active) || init # == allpointsactive
@@ -77,7 +57,24 @@ function subdivide_simplices!(points::Vector{Point{T}}, simplices::Vector{Index}
 
                     new1 = midpoint(simplex[keys[max1_idx]]...) # new point 1
                     new2 = midpoint(simplex[keys[max2_idx]]...) # new point 2
-                    append!(points, [new1, new2]) #############
+
+                    already_created_1 = findall(p->isequal(p, new1), points)
+                    already_created_2 = findall(p->isequal(p, new2), points)
+
+                    if isempty(already_created_1)
+                        push!(points, new1)
+                        new1_idx = l+1
+                    else
+                        new1_idx = already_created_1[1]
+                    end
+                    
+                    if isempty(already_created_2)
+                        push!(points, new2)
+                        new2_idx = l+1+ isempty(already_created_1)
+                    else
+                        new2_idx = already_created_2[1]
+                    end
+
                     simplices[i3].active = false #############
 
                     push!(keys, [keys[max1_idx][1],5],[5,keys[max1_idx][2]] )
@@ -116,10 +113,10 @@ function subdivide_simplices!(points::Vector{Point{T}}, simplices::Vector{Index}
                     new_sim2 = simplex[new_sim2_idx]
                     
                     ### now translate back to the actual indices
-                    proper_indices = [v1,v2,v3,v4, l+1, l+2]
+                    proper_indices = [v1,v2,v3,v4, new1_idx, new2_idx]
                     append!(simplices, [
-                        Index(proper_indices[new_sim1_idx]),
-                        Index(proper_indices[new_sim2_idx])])
+                        QuadA(proper_indices[new_sim1_idx]),
+                        QuadA(proper_indices[new_sim2_idx])])
                 end
             
             elseif !any([p1.active, p2.active, p3.active, p4.active])
@@ -132,37 +129,28 @@ end
 
 
 
-function subdivide(points::Vector{Point{T}}, simplices::Vector{Index}, Δ::Float64) where T<:Number
+function subdivide(points::Vector{<:PointA}, simplices::Vector{QuadA}, Δ::Float64)
     n_old = length(simplices)
     n_new = n_old + 1
     while (n_old != n_new)
         n_old = n_new
-        subdivide_simplices!(points, simplices, Δ)
+        subdivide_quads!(points, simplices, Δ)
         filter!(sim->sim.active, simplices)
         n_new = length(simplices)
     end 
 end
 
 
-function initialise_grid(t1min::ComplexF64, t1max::ComplexF64,
- t2min::ComplexF64, t2max::ComplexF64,
- Δ::Float64, flow_bounds=[true, true, true, true])
-    points = [
-        Point(t1min, t2min, flow_bounds[1]), 
-        Point(t1min, t2max, flow_bounds[2]), 
-        Point(t1max, t2max, flow_bounds[3]),
-        Point(t1max, t2min, flow_bounds[4])]  
-
-
-    simplices = [Index([1,2,3,4])]
+function initialise_grid_quads(points::Vector{<:PointA}, Δ::Float64)
+    simplices = [QuadA([1,2,3,4])]
     
-    ###     subdivide_2(points, simplices, Δ) # instead of calling this I'll do it here directly
+    ### subdivide_2(points, simplices, Δ) # instead of calling this I'll do it here directly
     n_old = length(simplices)
     n_new = 0 #n_old - 1
     
     while (n_old != n_new)
         n_old = n_new
-        subdivide_simplices!(points, simplices, Δ, n_new == 0)
+        subdivide_quads!(points, simplices, Δ, n_new == 0)
         filter!(sim->sim.active, simplices)
         n_new = length(simplices)
     end    
@@ -170,15 +158,14 @@ function initialise_grid(t1min::ComplexF64, t1max::ComplexF64,
 end
 
 
-### flow down
-
-function flow_down!(simplices::Vector{Index},points::Vector{Point{T}},
+### flowing a whole meshed surface
+function flow_down!(simplices::Vector{QuadA},points::Vector{<:PointA},
         f::Function,
         f_grad::Function;
-        threshold::Float64=0.5, # for normalisation of thr gradient
+        threshold::Float64=0.5, # for normalisation of the gradient
         δ::Float64=0.5, # flowstepfactor
         h_threshold::Float64=-20.
-        ) where T<:Number
+        )
 
     for i1 in 1:length(points)
         if points[i1].active # for the active points
@@ -190,7 +177,7 @@ function flow_down!(simplices::Vector{Index},points::Vector{Point{T}},
 
     for i2 in eachindex(simplices)
         if simplices[i2].active
-            for v in simplices[i2].coord
+            for v in simplices[i2].indices
                 if real(f(points[v].x, points[v].y)) < h_threshold 
                     simplices[i2].active = false # am I sure that I want to turn the whole simplex inactive?
                     points[v].active = false
@@ -211,24 +198,16 @@ function has_converged(history::Vector{T}; tol::Float64=1., window_size::Int=10)
 end
 
 
-### utils
-struct Quadrilateral
-    points::Vector{Point}
-end
-
 ### not sure if this is needed
-# isequal(q1::Quadrilateral,q2::Quadrilateral) = all([isequal(q1.points[i],q2.points[i]) for i in 1:4])
-# Base.hash(q::Quadrilateral, h::UInt) = hash([(p.x, p.y) for p in q.points], h)
-
-
+# isequal(q1::QuadC,q2::QuadC) = all([isequal(q1.points[i],q2.points[i]) for i in 1:4])
+# Base.hash(q::QuadC, h::UInt) = hash([(p.x, p.y) for p in q.points], h)
 
 
 ### get simplices
-function get_simplices(
+function get_flowed_quads(
     f::Function,
     f_grad::Function,
-    t1min::Number, t1max::Number,
-    t2min::Number, t2max::Number;
+    init_points::Vector{<:PointA};
     Nflow::Int64=50,
     Δinit::Float64 = 10.,
     gradnthreshold::Float64 = 0.5, # grad normalisation threshold
@@ -241,19 +220,19 @@ function get_simplices(
     )
 
     netsimplices = Vector{Int64}()
-    (points, simplices) = initialise_grid(complex(t1min),complex(t1max),complex(t2min),complex(t2max), Δinit, flow_bounds)
+    (points, simplices) = initialise_grid_quads(init_points, Δinit)
+
     overboard = false
     push!(netsimplices, length(simplices))
     for i_flow in 1:Nflow
         nsimplices = length(simplices)
-        # println(netsimplices)
+
         flow_down!(simplices, points, f, f_grad,
                 threshold = gradnthreshold, δ=flowstepfactor, h_threshold = h_threshold)
         subdivide(points, simplices, subdividethreshold)
 
-        
+        ### several termination conditions below
         net = (length(simplices)-nsimplices)
-        # println(net)
         if net !== 0
             push!(netsimplices, net)
             i_flow > 1 ? overboard = true : false
@@ -278,57 +257,13 @@ function get_simplices(
         end
     end
 
-    quads =  [Quadrilateral(points[sim.coord]) for sim in simplices]
+    quads =  [QuadC(points[sim.indices]) for sim in simplices]
 
-    return quads, netsimplices
+    return quads, points, simplices
 end
 
 
-#### integrate the quads
-using FastGaussQuadrature
-
-import Base.map
-function map(p::Vector{Float64}, p1::Point, p2::Point, p3::Point, p4::Point)
-    return ([p1.x,p1.y] .* (1. - p[1]) * (1. - p[2]) + 
-            [p2.x,p2.y] .* (1. + p[1]) * (1. - p[2]) + 
-            [p3.x,p3.y] .* (1. + p[1]) * (1. + p[2]) + 
-            [p4.x,p4.y] .* (1. - p[1]) * (1. + p[2])) / 4.
-end
-
-
-function jacobian(p::Vector{Float64}, p1::Point, p2::Point, p3::Point, p4::Point)
-    A = +(p1.x - p3.x) * (p2.y - p4.y) - (p1.y - p3.y) * (p2.x - p4.x)
-    B = -(p1.x - p2.x) * (p3.y - p4.y) + (p1.y - p2.y) * (p3.x - p4.x)
-    C = +(p2.x - p3.x) * (p1.y - p4.y) - (p2.y - p3.y) * (p1.x - p4.x)
-    return (A + B * p[1] + C * p[2]) / 8.
-end;
-
-function integrate_quadrilateral(
-    f::Function,
-    quad::Quadrilateral, n::Int64=7;
-    prefactor::Function=(ti,tr) -> ones(2)
-    )
-    
-        p1, p2, p3, p4 = quad.points
-
-        x, w = gausslegendre(n);
-        y = x;
-        sum = [0. + 0im, 0. + 0im]
-        for i=1:n, j=1:n
-            jac = -jacobian([x[i], y[j]], p1, p2, p3, p4) # this minus sign here comes from that debugging experiment in the 2024-10-20 figures spectra... NB
-            
-            ti,tr = map([x[i], x[j]], p1, p2, p3, p4)
-            action = f(ti,tr)
-    
-            sum = sum + jac * prefactor(ti, tr) * exp(action) * w[i] * w[j]
-        end
-        
-    return sum
-    
-end
-
-
-function integrate_flowed_path(
+function integrate_flowed_quads(
     f::Function,
     f_grad::Function,
     timin::Number, timax::Number,
@@ -347,7 +282,7 @@ function integrate_flowed_path(
     )
 
     netsimplices = Vector{Int64}()
-    (points, simplices) = initialise_grid(complex(timin), complex(timax), complex(ttmin), complex(ttmax), Δinit)
+    (points, simplices) = initialise_grid_parallelogram(complex(timin), complex(timax), complex(ttmin), complex(ttmax), Δinit)
     overboard = false
     prev_integral = complex(ones(2))
     int = complex(zeros(2))
@@ -362,15 +297,11 @@ function integrate_flowed_path(
         # @show simplices
         subdivide(points, simplices, subdividethreshold)
         # @show simplices
-        quads =  [Quadrilateral(points[sim.coord]) for sim in simplices]
+        quads =  [QuadC(points[sim.indices]) for sim in simplices]
         int = complex(zeros(2))
         for quad in quads
             int += integrate_quadrilateral(f, quad, prefactor = prefactor)
         end
-
-        # @show int
-#         push!(integrals, int[1])
-#         println("int: ", int)
 
         abs_diff = norm(int .- prev_integral) 
         if 0 < abs_diff < integral_accuracy # if I don't want to stop here I can just set the goal incredibly low
@@ -396,8 +327,6 @@ function integrate_flowed_path(
 #         end
 
 
-        
-
         if isempty(findall(sim->sim.active, simplices))
             println("I broke because I ran out of simplices after $i_flow steps. This might be solved by using a lower h_threshold."); break
         end
@@ -413,7 +342,53 @@ function integrate_flowed_path(
         end
     end
 
-    return int,length(simplices)
+    return int, length(simplices)
+end
+
+
+function integrate_flowed_quads_fixed_Nflow(
+    f::Function,
+    f_grad::Function,
+    init_points::Vector{<:PointA};
+    prefactor::Function = (ti,tr) -> ones(2),
+    Nflow::Int64=50,
+    Δinit::Float64 = 10.,
+    gradnthreshold::Float64 = 0.5, # grad normalisation threshold
+    flowstepfactor::Float64 = 2., # flowstepfactor
+    subdividethreshold::Float64 = 8., # subdivide threshold, wants to be 4 * δ
+    h_threshold::Float64 = -150.,
+    maxNsimplices::Int64=5000,
+    print_message::Bool=true
+    )
+
+    netsimplices = Vector{Int64}()
+    (points, simplices) = initialise_grid(init_points, Δinit)
+    int = complex(zeros(2))
+
+    for i_flow in 1:Nflow
+        nsimplices = length(simplices)
+
+        flow_down!(simplices, points, f, f_grad,
+                threshold = gradnthreshold, δ=flowstepfactor, h_threshold = h_threshold)
+        subdivide(points, simplices, subdividethreshold)
+        quads =  [QuadC(points[sim.indices]) for sim in simplices]
+        int = complex(zeros(2))
+        for quad in quads
+            int += integrate_quadrilateral(f, quad, prefactor = prefactor)
+        end
+
+        if isempty(findall(sim->sim.active, simplices))
+            println("I broke because I ran out of simplices after $i_flow steps. This might be solved by using a lower h_threshold."); break
+        end
+        
+        if length(simplices) > maxNsimplices 
+            print_message ? println("I broke after $i_flow steps because I have more than $maxNsimplices simplices now.") : nothing
+            break
+        end        
+
+    end
+
+    return int, length(simplices)
 end
 
 nothing

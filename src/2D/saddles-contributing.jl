@@ -9,11 +9,11 @@
 	    return norm(p .- midpoint)
 	end
 
-	function distance_point_to_line(p::Point, l::LineSeg)
+	function distance_point_to_line(p::PointA, l::LineSeg)
 	    return distance_point_to_line([p.x,p.y], [l.s.x, l.s.y], [l.e.x, l.e.y])
 	end
 
-	# function find_crossing(line::Vector{LineSeg}, point::Point{T}, tolerance::Float64=0.8) where T<:Real
+	# function find_crossing(line::Vector{LineSeg}, point::PointA{T}, tolerance::Float64=0.8) where T<:Real
 	#     mindist, index = findmin([distance_point_to_line(point, seg) for seg in line])
 
 	#     if mindist < tolerance
@@ -46,7 +46,7 @@
     end
 
 
-    function find_crossing(line::Vector{LineSeg}, point::Point{T}, tolerance::Float64=1.; threshold::Float64=0.5,
+    function find_crossing(line::Vector{LineSeg}, point::PointA{T}, tolerance::Float64=1.; threshold::Float64=0.5,
         loginfo=[]) where T<:Real
 
         distances = [distance_point_to_line(point, seg) for seg in line]
@@ -72,12 +72,12 @@
     end
 
 
-    function find_crossing(curve::Curve2{Tuple{T, T}}, point::Point{T}, tolerance::Float64=0.8; threshold::Float64=0.5) where T<:Real
-        line = [LineSeg( Point(curve.vertices[i]...), Point(curve.vertices[i+1]...)) for i in 1:(length(curve.vertices)-1) ]
+    function find_crossing(curve::Curve2{Tuple{T, T}}, point::PointA{T}, tolerance::Float64=0.8; threshold::Float64=0.5) where T<:Real
+        line = [LineSeg( PointA(curve.vertices[i]...), PointA(curve.vertices[i+1]...)) for i in 1:(length(curve.vertices)-1) ]
         return find_crossing(line, point, tolerance, threshold=threshold)
     end
 
-    function find_crossing(nocurve::Missing, point::Point{T}, tolerance::Float64=0.8; threshold::Float64=0.5) where T<:Real
+    function find_crossing(nocurve::Missing, point::PointA{T}, tolerance::Float64=0.8; threshold::Float64=0.5) where T<:Real
         return nothing
     end
 
@@ -114,7 +114,7 @@ function check_contribution(necklace::Vector{LineSeg},
     flowstepfactor = try kwargs[:flowstepfactor] catch e 0.8 end
 
     ### check if necklace hits real plane
-    p = Point(0.,0.)
+    p = PointA(0.,0.)
     idx = find_crossing( imag.(necklace), p, threshold = 2*flowstepfactor) # can add loginfo here
     
     if isnothing(idx)
