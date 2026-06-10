@@ -333,7 +333,7 @@ function get_flowed_triangles(
     init_points::Vector{<:PointA};
     Nflow::Int64=50,
     Δinit::Float64 = 10.,
-    gradnthreshold::Float64 = 0.5, # grad normalisation threshold
+    gradnthreshold::Float64 = 0.05, # grad normalisation threshold
     flowstepfactor::Float64 = 2., # flowstepfactor
     subdividethreshold::Float64 = 8., # subdivide threshold, wants to be 4 * δ
     h_threshold::Float64 = -150.,

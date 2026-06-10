@@ -24,9 +24,6 @@ function initialise_triangulated_necklace(ti::ComplexF64, tr::ComplexF64, f_hess
         #### this is very stupid!!! I'm projecting back and forth.
     u1 = [vec[1] for vec in eachrow(eigvec_mat)]
     u2 = [vec[2] for vec in eachrow(eigvec_mat)]
-    #         u1 = toR4(eigenvectors[1]...)
-    #         u2 = toR4(eigenvectors[2]...)
-   
     
     ### this is the same as in the other triangulation functions I hope
         v1 = toR4(ti,tr)
@@ -39,7 +36,18 @@ function initialise_triangulated_necklace(ti::ComplexF64, tr::ComplexF64, f_hess
 
         ### this is the very first triangles around the saddle point
         connections = delaunay(pts)
-        triangles = [TriangleA(inds) for inds in eachcol(connections)]
+
+        ### ensure they are all oriented in the same direction
+        n_ref = triangle_normal(points_all[eachcol(connections)[1]]...) # randomly choose the first triangle as a reference triangle TODO could be a smarter choice
+        triangles = TriangleA[]
+        for inds in eachcol(connections)
+            n = triangle_normal(points_all[inds]...)
+            if real(dot(n, n_ref)) > 0 
+                push!(triangles, TriangleA(inds))
+            else
+                push!(triangles, TriangleA(reverse(inds)))
+            end
+        end
 
     indices_necklace = collect(2:Ninit+1)
     
@@ -114,17 +122,17 @@ function triangulate_flowed_points(points_all::Vector, first_brim::Vector, secon
         ### certainly I could use this "actives" here instead of the pairwise testing
         #         actives = [p.active for p in [fb_i, sb_i, fb_n, sb_n]]
         if isequal(fb_i, sb_i) && isequal(fb_n, sb_n) 
-        # println("case 1, no one flows.")
+            # println("case 1, no one flows.")
             push!(extra_edges, (globals[1], globals[4]))
             continue
         elseif isequal(fb_i, sb_i) && !isequal(fb_n, sb_n)
-        # println("case 2, i doesn't flow, defo take triangle choice 2.")
+            # println("case 2, i doesn't flow, defo take triangle choice 2.")
             push!(new_triangles_local, TriangleA([i, i3, i4]) )
         elseif !isequal(fb_i, sb_i) && isequal(fb_n, sb_n)
-        # println("case 3, i flows, but i+1 doesn't, defo take triangle choice 1.")
+            # println("case 3, i flows, but i+1 doesn't, defo take triangle choice 1.")
             push!(new_triangles_local, TriangleA([i, i2, i4]) )
         else 
-        # println("case 4, gotta compare the distances.")
+            # println("case 4, gotta compare the distances.")
             d13 = dist(fb_i, sb_n)
             d24 = dist(sb_i, fb_n)
 
@@ -257,9 +265,23 @@ function get_SD_thimble_triangles(
         union!(points_all, points_necklace)
 
             @assert length(points_all) == length(unique(points_all))
+
         ### triangulate this brim
-        new_triangles, extra_edges = triangulate_flowed_points(points_all, first_brim, second_brim)
+        new_triangles_unoriented, extra_edges = triangulate_flowed_points(points_all, first_brim, second_brim)
         
+        ### make sure new triangles are well oriented w.r.t. a previous one
+        n_ref = triangle_normal(points_all[triangles[end].indices]...) # choose the last triangle as a reference TODO this isn't necessarily a good choice
+        new_triangles = TriangleA[]
+        for inds in new_triangles_unoriented
+            n = triangle_normal(points_all[inds.indices]...)
+
+            if real(dot(n, n_ref)) > 0 
+                push!(new_triangles, TriangleA(inds.indices, inds.active))
+            else
+                push!(new_triangles, TriangleA(reverse(inds.indices), inds.active))
+            end
+        end
+
         ### subdivide the new triangles
         subdivide_triangles!(points_all, new_triangles, subdividethreshold)
         

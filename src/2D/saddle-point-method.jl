@@ -2,9 +2,9 @@ function hessian_root(h::AbstractArray)
     ### I should definitely work this out properly and also make sure this actually gets rid of the branch cuts...
 
 #     h = f_hessian(ti, tr)
-    xd2S_dti2 = -conj(complex(h[1:2,1]...))
-    xd2S_dtr2 = -conj(complex(h[3:4,3]...))
-    xd2S_dtitr = -conj(complex(h[3:4,1]...))
+    xd2S_dti2 = 1im*conj(complex(h[1:2,1]...))
+    xd2S_dtr2 = 1im*conj(complex(h[3:4,3]...))
+    xd2S_dtitr = 1im*conj(complex(h[3:4,1]...))
     
     # ### RBSFA hessian_root
     sqrt1 = sqrt(2π/ (im*xd2S_dti2 ))
@@ -30,4 +30,18 @@ function saddles_gaussian_contribution(f::Function,
 
     return prefactor(ti,tr) .* prefactor_spm .* exp(f(ti,tr))
         
+end
+
+
+#### when we integrated the thimble around a saddle point, we still need to find the sign of the corresponding intersection number. Idk how to actually find this sign, but we can just compare the sign of the integrated thimble with the sign of the Gaussian approximation around the saddle point ;-)
+function intersection_number_sign_cheat(int::AbstractArray{<:Complex}, 
+    f::Function,
+    f_hessian::Function,
+    ti::ComplexF64, tr::ComplexF64;
+    prefactor::Function = (ti,tr) -> ones(2)
+    )
+            
+    spm = saddles_gaussian_contribution(f, f_hessian, ti, tr, prefactor = prefactor)
+
+    return sign(real(dot(int, spm)))
 end

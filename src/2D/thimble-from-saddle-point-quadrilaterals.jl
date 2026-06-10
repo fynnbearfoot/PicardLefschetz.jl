@@ -6,7 +6,6 @@ function initialise_SD!(necklace::Vector{LineSeg}, points::Vector{<:PointA},
         Ninit::Int64 = 20,
         ϵ::Float64 = 0.01)
 
-    # hessian = my_hessian(b,Ip,q,ti,tr)
     hessian = f_hessian(ti, tr)
 
     # this could certainly be made more julian    
@@ -251,7 +250,7 @@ function get_SD_thimble_quads(
     
     ### check that Ninit ganzzahlig
     necklace = Vector{LineSeg}()
-    points = Vector{<:PointA}()
+    points = Vector{PointA}()
     
     initialise_SD!(necklace, points, ti, tr, f_hessian=f_hessian, Ninit = Ninit, ϵ = eigvecfactorinit)
     
@@ -303,93 +302,94 @@ end
 
 
 
-
-function integrate_SD_thimble(
-    f::Function,
-    f_grad::Function,
-    f_hessian::Function,
-    ti::ComplexF64, tr::ComplexF64;
-    prefactor::Function=(ti,tr) -> ones(2),
-    Ninit::Int64=20, Ncounter::Int64=500,
-    accuracy::Float64=1e-4,
-    eigvecfactorinit::Float64 = 0.02, # I should come up with sophisticated guesses here.
-    flowstepfactor::Float64 = 4., 
-    subdividethreshold::Float64 = 1.)
-    
-    function integrate_annulus(necklace::Vector{LineSeg},
-            points::Vector{<:PointA}, prev_necklace::Vector{LineSeg})
+### TODO double-check this function (add the correct intersection number etc.)
+# function integrate_SD_thimble(
+#     f::Function,
+#     f_grad::Function,
+#     f_hessian::Function,
+#     ti::ComplexF64, tr::ComplexF64;
+#     prefactor::Function=(ti,tr) -> ones(2),
+#     Ninit::Int64=20, Ncounter::Int64=500,
+#     accuracy::Float64=1e-4,
+#     eigvecfactorinit::Float64 = 0.02, # I should come up with sophisticated guesses here.
+#     flowstepfactor::Float64 = 4., 
+#     subdividethreshold::Float64 = 1.)
+#     println("careful, this function is probably outdated. Most likely the intersection numebr sign is incorrect here.")
+#     function integrate_annulus(necklace::Vector{LineSeg},
+#             points::Vector{<:PointA}, prev_necklace::Vector{LineSeg})
         
-        new_necklace = adorn_necklace(sort_linesegs(necklace), points)  
-        int = zeros(ComplexF64, 2)
-        for idx in 1:length(prev_necklace)
-            quad = make_quad(prev_necklace[idx], new_necklace[idx])
+#         new_necklace = adorn_necklace(sort_linesegs(necklace), points)  
+#         int = zeros(ComplexF64, 2)
+#         for idx in 1:length(prev_necklace)
+#             quad = make_quad(prev_necklace[idx], new_necklace[idx])
 
-            int .+= integrate_quadrangle(f, quad, prefactor=prefactor)
-        end
+#             int .+= integrate_quadrangle(f, quad, prefactor=prefactor)
+#         end
         
-        return int
-    end
+#         return int
+#     end
         
 
-    ### TODO: check that Ninit is even
-    necklace = Vector{LineSeg}()
-    points = Vector{<:PointA}()
+#     ### TODO: check that Ninit is even
+#     necklace = Vector{LineSeg}()
+#     points = Vector{<:PointA}()
     
-    initialise_SD!(necklace, points, ti, tr, f_hessian = f_hessian, Ninit = Ninit, ϵ = eigvecfactorinit)
+#     initialise_SD!(necklace, points, ti, tr, f_hessian = f_hessian, Ninit = Ninit, ϵ = eigvecfactorinit)
     
-    ### TODO find a suitable threshold for the normalisation of the gradient
-    gradient0 = [norm(conj.(f_grad(p.x, p.y))) for p in points]
-    threshold = round(minimum(gradient0), RoundDown, sigdigits=2)
+#     ### TODO find a suitable threshold for the normalisation of the gradient
+#     gradient0 = [norm(conj.(f_grad(p.x, p.y))) for p in points]
+#     threshold = round(minimum(gradient0), RoundDown, sigdigits=2)
 
-    total_integral = zeros(ComplexF64,2)
+#     total_integral = zeros(ComplexF64,2)
     
-    counter = 0
+#     counter = 0
 
-    ### sign of the intersection number
-    sign_in = sign(imag(hessian_root(f_hessian(ti, tr))))
+#     ### TODO this isn't updated yet!
+#     ### sign of the intersection number
+#     sign_in = sign(imag(hessian_root(f_hessian(ti, tr))))
 
-    while counter < Ncounter
-        counter += 1
+#     while counter < Ncounter
+#         counter += 1
             
-        prev_necklace = deepcopy(adorn_necklace(sort_linesegs(necklace), points))   
-        flow_down!(necklace, points, f, f_grad, threshold = threshold, δ = flowstepfactor)
+#         prev_necklace = deepcopy(adorn_necklace(sort_linesegs(necklace), points))   
+#         flow_down!(necklace, points, f, f_grad, threshold = threshold, δ = flowstepfactor)
         
-        if count([p.active for p in points]) == 0
-            @debug "I broke because the flow stopped after $counter iterations"
-            break
-        end
+#         if count([p.active for p in points]) == 0
+#             @debug "I broke because the flow stopped after $counter iterations"
+#             break
+#         end
         
         
-        int = sign_in * integrate_annulus(necklace, points, prev_necklace)
-        total_integral .+= int
+#         int = sign_in * integrate_annulus(necklace, points, prev_necklace)
+#         total_integral .+= int
         
 
-        ### these are the convergence criteria
-        # abs_diff = norm(int .- prev_integral) 
-        # if 0 < abs_diff < integral_accuracy 
+#         ### these are the convergence criteria
+#         # abs_diff = norm(int .- prev_integral) 
+#         # if 0 < abs_diff < integral_accuracy 
 
-        # rel_diff = norm(filter!(!isnan, (int .- prev_integral) ./ prev_integral))
-        # if 0 < rel_diff < accuracy
+#         # rel_diff = norm(filter!(!isnan, (int .- prev_integral) ./ prev_integral))
+#         # if 0 < rel_diff < accuracy
 
 
-        if 0 < norm(reim(int)./reim(total_integral)) < accuracy
-    #             println("I broke after $counter iterations because the accuracy goal of $accuracy was met.")
-            break
-        end         
+#         if 0 < norm(reim(int)./reim(total_integral)) < accuracy
+#     #             println("I broke after $counter iterations because the accuracy goal of $accuracy was met.")
+#             break
+#         end         
         
-        for i in 1:length(necklace)
-            subdivide!(necklace[i], necklace, points, Δ = subdividethreshold)
-        end
-        keepat!(necklace, [ls.active for ls in necklace])
+#         for i in 1:length(necklace)
+#             subdivide!(necklace[i], necklace, points, Δ = subdividethreshold)
+#         end
+#         keepat!(necklace, [ls.active for ls in necklace])
        
-    end
+#     end
     
-    if counter == Ncounter && Ncounter > 1
-        println("I broke because the SD thimble counter reached its max, i.e. $Ncounter.")
-    end
+#     if counter == Ncounter && Ncounter > 1
+#         println("I broke because the SD thimble counter reached its max, i.e. $Ncounter.")
+#     end
     
-    return total_integral
-end
+#     return total_integral
+# end
 
 
 nothing
